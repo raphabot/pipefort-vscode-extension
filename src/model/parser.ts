@@ -126,7 +126,12 @@ export function parseScanOutput(stdout: string): ScanOutput {
   if (!trimmed) {
     return { findings: [], toxic_combinations: [] };
   }
-  const raw: unknown = JSON.parse(trimmed);
+  // `--fix` prepends a human "Successfully fixed …" line before the JSON, so
+  // start parsing at the first `{`. Logs go to stderr, so stdout has no other
+  // braces. Non-JSON input still throws (callers keep previous results).
+  const start = trimmed.indexOf("{");
+  const jsonText = start > 0 ? trimmed.slice(start) : trimmed;
+  const raw: unknown = JSON.parse(jsonText);
   if (!isObject(raw)) {
     return { findings: [], toxic_combinations: [] };
   }

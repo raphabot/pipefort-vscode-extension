@@ -14,6 +14,7 @@ import {
 } from "./cliRunner";
 
 const SAVE_DEBOUNCE_MS = 500;
+const ONLINE_COOLDOWN_MS = 5 * 60 * 1000;
 
 export interface SchedulerActivity {
   scanning: boolean;
@@ -39,6 +40,7 @@ export class ScanScheduler {
   private queue = new Map<string, Job>();
   private running: { job: Job; cts: vscode.CancellationTokenSource } | undefined;
   private debounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  private lastOnlineScan = new Map<string, number>();
 
   private readonly _onDidChangeActivity =
     new vscode.EventEmitter<SchedulerActivity>();
@@ -71,15 +73,20 @@ export class ScanScheduler {
     void this.drain();
   }
 
+  private fileKey(uri: vscode.Uri, online: boolean): string {
+    return `${online ? "file-online" : "file"}:${uri.fsPath}`;
+  }
+
   /** Scan a single file. Saves pass `debounce: true` and run offline. */
   scanFile(
     uri: vscode.Uri,
     opts: { debounce?: boolean; online?: boolean } = {}
   ): void {
-    const key = `file:${uri.fsPath}`;
+    const online = opts.online ?? false;
+    const key = this.fileKey(uri, online);
     const schedule = () => {
       this.debounceTimers.delete(key);
-      this.enqueueFile(uri, opts.online ?? false);
+      this.enqueueFile(uri, online);
       void this.drain();
     };
     if (opts.debounce) {
@@ -91,6 +98,31 @@ export class ScanScheduler {
     } else {
       schedule();
     }
+  }
+
+  /**
+   * Handle a save: a debounced offline scan for fast feedback, plus a
+   * cooldown-gated online refresh when online audits are enabled and a token
+   * exists (so saves don't hammer the GitHub API).
+   */
+  async onSaveScan(uri: vscode.Uri): Promise<void> {
+    this.scanFile(uri, { debounce: true, online: false });
+
+    const settings = readSettings();
+    if (settings.onlineAudits === "off") {
+      return;
+    }
+    const now = Date.now();
+    const last = this.lastOnlineScan.get(uri.fsPath) ?? 0;
+    if (now - last < ONLINE_COOLDOWN_MS) {
+      return;
+    }
+    const token = await resolveGitHubToken(false);
+    if (!token && settings.onlineAudits === "auto") {
+      return;
+    }
+    this.lastOnlineScan.set(uri.fsPath, now);
+    this.scanFile(uri, { debounce: true, online: true });
   }
 
   private enqueueDir(folder: vscode.Uri): void {
@@ -125,7 +157,7 @@ export class ScanScheduler {
     if (folder && this.queue.has(`dir:${folder.uri.fsPath}`)) {
       return;
     }
-    const key = `file:${uri.fsPath}`;
+    const key = this.fileKey(uri, online);
     this.queue.set(key, {
       key,
       kind: "file",

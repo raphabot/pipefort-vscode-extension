@@ -5,6 +5,7 @@ import { ScanScheduler } from "./scan/scanScheduler";
 import { DiagnosticsPublisher } from "./ui/diagnostics";
 import { PipefortTreeProvider } from "./ui/treeView";
 import { PipefortStatusBar } from "./ui/statusBar";
+import { PipefortCodeActionProvider } from "./ui/codeActions";
 import { registerCommands } from "./commands";
 import { readSettings, onSettingsChanged } from "./settings";
 import { isPipefortTarget } from "./scan/targets";
@@ -20,10 +21,31 @@ export function activate(context: vscode.ExtensionContext): void {
   const tree = new PipefortTreeProvider(store);
   const statusBar = new PipefortStatusBar(store, scheduler);
 
-  context.subscriptions.push(store, scheduler, diagnostics, tree, statusBar);
+  context.subscriptions.push(
+    binaryManager,
+    store,
+    scheduler,
+    diagnostics,
+    tree,
+    statusBar
+  );
   context.subscriptions.push(tree.register());
 
+  // Quick fixes (suppress + fix-all) on YAML pipeline files.
+  context.subscriptions.push(
+    vscode.languages.registerCodeActionsProvider(
+      [{ language: "yaml" }, { pattern: "**/*.{yml,yaml}" }],
+      new PipefortCodeActionProvider(),
+      { providedCodeActionKinds: PipefortCodeActionProvider.providedKinds }
+    )
+  );
+
   registerCommands(context, { binaryManager, scheduler, store });
+
+  // Rescan when a newer managed CLI is installed.
+  context.subscriptions.push(
+    binaryManager.onDidUpdate(() => scheduler.scanWorkspace())
+  );
 
   // Scan on open.
   context.subscriptions.push(
@@ -38,7 +60,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument((doc) => {
       if (readSettings().scanOnSave && isPipefortTarget(doc.uri)) {
-        scheduler.scanFile(doc.uri, { debounce: true });
+        void scheduler.onSaveScan(doc.uri);
       }
     })
   );
