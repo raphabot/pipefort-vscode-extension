@@ -14,3 +14,6 @@ PLAN.md
 **/*.ts
 .vscode-test.mjs
 vitest.config.ts
+media/icon-source.svg
+.github/**
+.eslintrc.json

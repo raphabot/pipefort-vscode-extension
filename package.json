@@ -10,6 +10,7 @@
     "url": "https://github.com/raphabot/pipefort-vscode-extension"
   },
   "homepage": "https://pipefort.com",
+  "icon": "media/pipefort-128.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -201,8 +202,10 @@
     "build": "node esbuild.mjs --production",
     "watch": "node esbuild.mjs --watch",
     "compile": "tsc -p ./ --noEmit",
+    "compile-tests": "tsc -p ./",
     "lint": "eslint src test --ext ts",
     "test:unit": "vitest run",
+    "pretest:integration": "npm run build && npm run compile-tests",
     "test:integration": "vscode-test",
     "package": "vsce package",
     "publish:vsce": "vsce publish",

@@ -1,0 +1,103 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-unit:
+    name: Lint & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run compile
+      - run: npm run test:unit
+
+  integration:
+    name: Integration (${{ matrix.os }})
+    needs: lint-unit
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - run: npm ci
+
+      - name: Build pipefort CLI
+        id: cli
+        shell: bash
+        run: |
+          go install github.com/raphabot/pipefort@latest || true
+          BIN="$(go env GOPATH)/bin/pipefort"
+          if [ "${{ runner.os }}" = "Windows" ]; then BIN="$BIN.exe"; fi
+          if [ -f "$BIN" ]; then
+            echo "PIPEFORT_TEST_BINARY=$BIN" >> "$GITHUB_ENV"
+            echo "Using CLI at $BIN"
+          else
+            echo "pipefort CLI unavailable; integration tests will skip."
+          fi
+
+      - name: Run integration tests (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration
+
+      - name: Run integration tests (Windows)
+        if: runner.os == 'Windows'
+        run: npm run test:integration
+
+  package:
+    name: Package VSIX
+    needs: integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx vsce package --out pipefort.vsix
+      - run: npx vsce ls
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pipefort-vsix
+          path: pipefort.vsix
+
+  publish:
+    name: Publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Publish to VS Code Marketplace
+        run: npx vsce publish
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      - name: Publish to Open VSX
+        run: npx ovsx publish -p "$OVSX_PAT"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
