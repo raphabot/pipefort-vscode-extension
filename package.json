@@ -1,0 +1,227 @@
+{
+  "name": "pipefort",
+  "displayName": "Pipefort",
+  "description": "Scan CI/CD pipelines for OWASP CI/CD Top 10, SLSA, and supply-chain issues — inline diagnostics, toxic-combination detection, and quick fixes.",
+  "version": "0.1.0",
+  "publisher": "pipefort",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raphabot/pipefort-vscode-extension"
+  },
+  "homepage": "https://pipefort.com",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Linters"
+  ],
+  "keywords": [
+    "ci",
+    "cd",
+    "security",
+    "github actions",
+    "gitlab ci",
+    "supply chain",
+    "slsa",
+    "owasp"
+  ],
+  "activationEvents": [
+    "workspaceContains:.github/workflows",
+    "workspaceContains:.gitlab-ci.yml",
+    "workspaceContains:.gitlab-ci.yaml",
+    "workspaceContains:.gitlab-ci"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "pipefort",
+          "title": "Pipefort",
+          "icon": "media/pipefort.svg"
+        }
+      ]
+    },
+    "views": {
+      "pipefort": [
+        {
+          "id": "pipefort.findings",
+          "name": "Findings",
+          "icon": "media/pipefort.svg",
+          "contextualTitle": "Pipefort"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "pipefort.findings",
+        "contents": "No Pipefort findings yet.\n[Scan Workspace](command:pipefort.scanWorkspace)\n\nPipefort scans your CI/CD pipeline definitions for security issues.\n[Open Settings](command:pipefort.openSettings)"
+      }
+    ],
+    "commands": [
+      {
+        "command": "pipefort.scanWorkspace",
+        "title": "Scan Workspace",
+        "category": "Pipefort",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pipefort.scanFile",
+        "title": "Scan Current File",
+        "category": "Pipefort"
+      },
+      {
+        "command": "pipefort.fixFile",
+        "title": "Fix All Auto-Fixable Issues in File",
+        "category": "Pipefort"
+      },
+      {
+        "command": "pipefort.showOutput",
+        "title": "Show Output",
+        "category": "Pipefort"
+      },
+      {
+        "command": "pipefort.openSettings",
+        "title": "Open Settings",
+        "category": "Pipefort"
+      },
+      {
+        "command": "pipefort.updateCli",
+        "title": "Update CLI",
+        "category": "Pipefort"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "pipefort.scanWorkspace",
+          "when": "view == pipefort.findings",
+          "group": "navigation"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "pipefort.scanFile",
+          "when": "resourceExtname =~ /\\.ya?ml$/"
+        },
+        {
+          "command": "pipefort.fixFile",
+          "when": "resourceExtname =~ /\\.ya?ml$/"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Pipefort",
+      "properties": {
+        "pipefort.binaryPath": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Absolute path to a `pipefort` binary. When set, overrides the auto-downloaded CLI."
+        },
+        "pipefort.cliVersion": {
+          "type": "string",
+          "default": "latest",
+          "markdownDescription": "CLI version to use: `latest` or a specific tag like `v1.2.3`."
+        },
+        "pipefort.onlineAudits": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "on",
+            "off"
+          ],
+          "default": "auto",
+          "markdownDescription": "Run online pin audits (typosquat / vulnerable-action detection, needs a GitHub token). `auto` enables them when a token is found."
+        },
+        "pipefort.ruleset": {
+          "type": "string",
+          "enum": [
+            "all",
+            "owasp",
+            "slsa",
+            "slsa-build-l1",
+            "slsa-build-l2",
+            "slsa-build-l3",
+            "slsa-source-l2",
+            "slsa-source-l3",
+            "slsa-source-l4"
+          ],
+          "default": "all",
+          "markdownDescription": "Which ruleset to apply."
+        },
+        "pipefort.persona": {
+          "type": "string",
+          "enum": [
+            "regular",
+            "pedantic",
+            "auditor"
+          ],
+          "default": "regular",
+          "markdownDescription": "Scanning persona / strictness."
+        },
+        "pipefort.minConfidence": {
+          "type": "string",
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH"
+          ],
+          "default": "LOW",
+          "markdownDescription": "Minimum confidence level for reported findings."
+        },
+        "pipefort.scanOnOpen": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Scan pipeline files when they are opened."
+        },
+        "pipefort.scanOnSave": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Scan pipeline files when they are saved."
+        },
+        "pipefort.scanOnStartup": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Run a full workspace scan when the extension activates."
+        },
+        "pipefort.extraArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "markdownDescription": "Extra command-line arguments passed to the pipefort CLI."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "compile": "tsc -p ./ --noEmit",
+    "lint": "eslint src test --ext ts",
+    "test:unit": "vitest run",
+    "test:integration": "vscode-test",
+    "package": "vsce package",
+    "publish:vsce": "vsce publish",
+    "publish:ovsx": "ovsx publish"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.3.9",
+    "@vscode/vsce": "^2.24.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.57.0",
+    "mocha": "^10.3.0",
+    "ovsx": "^0.9.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  }
+}
