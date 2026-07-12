@@ -3,6 +3,8 @@ import { BinaryManager } from "./binary/binaryManager";
 import { ResultStore } from "./scan/resultStore";
 import { ScanScheduler } from "./scan/scanScheduler";
 import { DiagnosticsPublisher } from "./ui/diagnostics";
+import { PipefortTreeProvider } from "./ui/treeView";
+import { PipefortStatusBar } from "./ui/statusBar";
 import { registerCommands } from "./commands";
 import { readSettings, onSettingsChanged } from "./settings";
 import { isPipefortTarget } from "./scan/targets";
@@ -15,8 +17,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const store = new ResultStore();
   const scheduler = new ScanScheduler(binaryManager, store);
   const diagnostics = new DiagnosticsPublisher(store);
+  const tree = new PipefortTreeProvider(store);
+  const statusBar = new PipefortStatusBar(store, scheduler);
 
-  context.subscriptions.push(store, scheduler, diagnostics);
+  context.subscriptions.push(store, scheduler, diagnostics, tree, statusBar);
+  context.subscriptions.push(tree.register());
 
   registerCommands(context, { binaryManager, scheduler, store });
 

